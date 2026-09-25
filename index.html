@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UG2 加密文件解密器 | 小学二年级联合会</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #3b82f6;
+      --primary-dark: #1d4ed8;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --surface-3: #f1f5f9;
+      --text: #0f172a;
+      --text-2: #334155;
+      --text-3: #64748b;
+      --border: #e2e8f0;
+      --border-2: #cbd5e1;
+      --success: #10b981;
+      --error: #ef4444;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+      --radius: 12px;
+      --radius-lg: 16px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #f0f4ff 0%, #f8fafc 50%, #fff1f2 100%);
+      min-height: 100vh;
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Animated background blobs */
+    .bg-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.4;
+      z-index: 0;
+      pointer-events: none;
+      animation: float 20s ease-in-out infinite;
+    }
+    .bg-blob.a { width: 400px; height: 400px; background: #bfdbfe; top: -100px; left: -100px; animation-delay: 0s; }
+    .bg-blob.b { width: 300px; height: 300px; background: #ddd6fe; bottom: -50px; right: -50px; animation-delay: -5s; }
+    .bg-blob.c { width: 250px; height: 250px; background: #fecdd3; top: 40%; left: 60%; animation-delay: -10s; opacity: 0.3; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -30px) scale(1.05); }
+      66% { transform: translate(-20px, 20px) scale(0.95); }
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 48px 0 32px;
+      animation: fadeInDown 0.8s ease-out;
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--primary);
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      border: 1px solid rgba(37, 99, 235, 0.15);
+    }
+    .header-badge svg { width: 16px; height: 16px; }
+    .header h1 {
+      font-family: 'Noto Serif SC', serif;
+      font-size: clamp(1.8rem, 5vw, 2.5rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    .header p {
+      color: var(--text-3);
+      font-size: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Upload Area */
+    .upload-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 32px;
+      margin: 24px 0;
+      border: 1px solid var(--border);
+      animation: fadeInUp 0.8s ease-out 0.2s both;
+      transition: var(--transition);
+    }
+    .upload-card.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+      transform: scale(1.01);
+    }
+    .upload-area {
+      border: 2px dashed var(--border-2);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--surface-2);
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-area::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, rgba(37,99,235,0.03) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .upload-area:hover::before { opacity: 1; }
+    .upload-area:hover {
+      border-color: var(--primary-light);
+      background: #f0f7ff;
+    }
+    .upload-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+    }
+    .upload-icon svg { width: 28px; height: 28px; color: white; }
+    .upload-title { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .upload-desc { font-size: 0.9rem; color: var(--text-3); }
+    .upload-hint { font-size: 0.75rem; color: var(--text-3); margin-top: 12px; opacity: 0.7; }
+    #fileInput { display: none; }
+
+    /* Status */
+    .status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .status.show { display: flex; }
+    .status.loading { background: #eff6ff; color: var(--primary); border: 1px solid #dbeafe; }
+    .status.success { background: #ecfdf5; color: var(--success); border: 1px solid #d1fae5; }
+    .status.error { background: #fef2f2; color: var(--error); border: 1px solid #fee2e2; }
+    .status svg { flex-shrink: 0; }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Content Display */
+    .content-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      animation: fadeInUp 0.8s ease-out 0.4s both;
+      display: none;
+    }
+    .content-card.show { display: block; }
+
+    .content-header {
+      padding: 32px 32px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+    }
+
+    .content-type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+    .type-article { background: #dbeafe; color: #1e40af; }
+    .type-post { background: #fce7f3; color: #9d174d; }
+
+    .content-title {
+      font-family: 'Noto Serif SC', serif;
+      font-size: clamp(1.5rem, 4vw, 2rem);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+
+    .content-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-3);
+      font-size: 0.9rem;
+    }
+    .meta-item svg { width: 18px; height: 18px; color: var(--text-3); opacity: 0.6; }
+    .meta-item strong { color: var(--text-2); font-weight: 600; }
+
+    .content-summary {
+      padding: 24px 32px;
+      background: #fefce8;
+      border-left: 4px solid #f59e0b;
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--text-2);
+      line-height: 1.7;
+      font-style: italic;
+    }
+    .content-summary:empty { display: none; }
+    .summary-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #d97706;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      font-style: normal;
+    }
+
+    .content-body {
+      padding: 32px;
+    }
+    .body-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .body-label svg { width: 16px; height: 16px; }
+
+    .markdown-raw {
+      font-family: 'Noto Sans SC', 'SF Mono', 'Fira Code', Consolas, monospace;
+      font-size: 0.9rem;
+      line-height: 1.8;
+      color: var(--text-2);
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--surface-2);
+      padding: 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    /* Scrollbar */
+    .markdown-raw::-webkit-scrollbar { width: 8px; height: 8px; }
+    .markdown-raw::-webkit-scrollbar-track { background: transparent; }
+    .markdown-raw::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+    .markdown-raw::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 32px 0;
+      color: var(--text-3);
+      font-size: 0.85rem;
+      animation: fadeIn 1s ease-out 0.6s both;
+    }
+    .footer a { color: var(--primary); text-decoration: none; font-weight: 500; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .container { padding: 16px; }
+      .header { padding: 32px 0 24px; }
+      .upload-card, .content-card { border-radius: var(--radius); padding: 20px; }
+      .upload-area { padding: 32px 16px; }
+      .content-header { padding: 24px 20px 20px; }
+      .content-summary { padding: 20px; }
+      .content-body { padding: 20px; }
+      .markdown-raw { padding: 16px; font-size: 0.85rem; }
+      .content-meta { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+
+    /* Dark mode support (auto) */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface: #1e293b;
+        --surface-2: #0f172a;
+        --surface-3: #334155;
+        --text: #f1f5f9;
+        --text-2: #cbd5e1;
+        --text-3: #94a3b8;
+        --border: #334155;
+        --border-2: #475569;
+      }
+      body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #2d1b2e 100%);
+      }
+      .upload-area { background: var(--surface-2); }
+      .upload-area:hover { background: #1e293b; }
+      .content-header { background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%); }
+      .content-summary { background: #3f3f00; }
+      .markdown-raw { background: var(--surface-2); }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-blob a"></div>
+  <div class="bg-blob b"></div>
+  <div class="bg-blob c"></div>
+
+  <div class="container">
+    <header class="header">
+      <div class="header-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        UG2 加密格式 v2
+      </div>
+      <h1>小学二年级联合会<br>加密文件解密器</h1>
+      <p>上传 UG2-ENCRYPTED-TXT 格式文件，自动解密并提取文章标题、创作者、摘要与 Markdown 原文。</p>
+    </header>
+
+    <div class="upload-card" id="dropZone">
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="upload-title">点击或拖拽上传加密文件</div>
+        <div class="upload-desc">支持 .txt 格式的 UG2-ENCRYPTED-TXT 文件</div>
+        <div class="upload-hint">文件仅在本地浏览器解密，不会上传至任何服务器</div>
+      </div>
+      <input type="file" id="fileInput" accept=".txt,text/plain">
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="content-card" id="contentCard">
+      <div class="content-header">
+        <div class="content-type-badge" id="typeBadge">文章</div>
+        <h2 class="content-title" id="contentTitle"></h2>
+        <div class="content-meta">
+          <div class="meta-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>创作者：<strong id="creatorName"></strong></span>
+          </div>
+        </div>
+      </div>
+      <div class="content-summary" id="contentSummary"></div>
+      <div class="content-body">
+        <div class="body-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Markdown 原文
+        </div>
+        <pre class="markdown-raw" id="markdownBody"></pre>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <p>基于 <a href="https://github.com/Lin-zikang/ug2.team" target="_blank">小学二年级联合会 UG2 项目</a> 加密格式实现</p>
+      <p style="margin-top:4px;opacity:0.7;">AES-256-GCM · PBKDF2-SHA-256 · 纯前端解密</p>
+    </footer>
+  </div>
+
+  <script>
+    // UG2 Crypto Constants
+    const SUBMISSION_KEY = 'UG2-OFFICIAL-SUBMISSION-KEY-v1::United-Grade-2';
+    const PBKDF2_ITERATIONS = 120000;
+
+    // DOM Elements
+    const dropZone = document.getElementById('dropZone');
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const status = document.getElementById('status');
+    const contentCard = document.getElementById('contentCard');
+    const contentTitle = document.getElementById('contentTitle');
+    const creatorName = document.getElementById('creatorName');
+    const typeBadge = document.getElementById('typeBadge');
+    const contentSummary = document.getElementById('contentSummary');
+    const markdownBody = document.getElementById('markdownBody');
+
+    // Event Listeners
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    // Drag & Drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt.files.length) handleFile(dt.files[0]);
+    }, false);
+
+    // Status helpers
+    function showStatus(msg, type) {
+      status.innerHTML = type === 'loading'
+        ? '<div class="spinner"></div><span>' + msg + '</span>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>' + msg + '</span>';
+      status.className = 'status show ' + type;
+    }
+    function hideStatus() { status.className = 'status'; }
+    function showError(msg) {
+      status.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>' + msg + '</span>';
+      status.className = 'status show error';
+    }
+
+    // Base64 helpers
+    function base64ToArray(value) {
+      const binary = atob(value);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+    function decodeUtf8(bytes) {
+      const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      return decoded.replace(/^\uFEFF/, '');
+    }
+
+    // Derive key using PBKDF2
+    async function deriveKey(salt) {
+      if (!window.crypto?.subtle) throw new Error('当前环境不支持 Web Crypto，请通过 HTTPS 或 localhost 打开网页。');
+      const material = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(SUBMISSION_KEY),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        material,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    // Decrypt UG2 file
+    async function decryptText(text) {
+      let envelope;
+      try { envelope = JSON.parse(String(text).replace(/^\uFEFF/, '')); }
+      catch (_) { throw new Error('不是有效的 UG2 加密文本文件。'); }
+      if (envelope?.format !== 'UG2-ENCRYPTED-TXT' || !envelope.encryption) {
+        throw new Error('文件格式不受支持，仅支持 UG2-ENCRYPTED-TXT v2 格式。');
+      }
+      const salt = base64ToArray(envelope.encryption.salt);
+      const iv = base64ToArray(envelope.encryption.iv);
+      const encrypted = base64ToArray(envelope.encryption.data);
+      const key = await deriveKey(salt);
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+      const payload = JSON.parse(decodeUtf8(decrypted));
+      const result = {
+        ...payload,
+        title: payload.title || envelope.title || '未命名',
+        creator: payload.creator || envelope.creator || '未知创作者',
+        type: payload.type || envelope.type || 'article',
+        summary: typeof payload.summary === 'string' ? payload.summary.trim() : (envelope.summary || '')
+      };
+      return result;
+    }
+
+    // Handle file
+    async function handleFile(file) {
+      hideStatus();
+      contentCard.classList.remove('show');
+      showStatus('正在解密文件…', 'loading');
+
+      try {
+        const text = await file.text();
+        const data = await decryptText(text);
+
+        // Render content
+        contentTitle.textContent = data.title;
+        creatorName.textContent = data.creator;
+        typeBadge.textContent = data.type === 'post' ? '帖子' : '文章';
+        typeBadge.className = 'content-type-badge ' + (data.type === 'post' ? 'type-post' : 'type-article');
+
+        if (data.summary) {
+          contentSummary.innerHTML = '<span class="summary-label">内容摘要</span>' + escapeHtml(data.summary);
+          contentSummary.style.display = 'block';
+        } else {
+          contentSummary.style.display = 'none';
+        }
+
+        markdownBody.textContent = data.markdown || '(无正文)';
+
+        contentCard.classList.add('show');
+        hideStatus();
+
+        // Smooth scroll to content
+        setTimeout(() => {
+          contentCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      } catch (err) {
+        showError(err.message || '解密失败，请检查文件格式是否正确。');
+        contentCard.classList.remove('show');
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
